@@ -10,35 +10,63 @@ DB_USER=os.environ.get("DB_USER")
 DB_PASSWORD=os.environ.get("DB_PASSWORD")
 DB=os.environ.get("DB")
 
-db = mysql.connector.connect(
-  host=DB_HOST,
-  user=DB_USER,
-  password=DB_PASSWORD,
-  database=DB
-)
-cursor = db.cursor()
+# db = mysql.connector.connect(
+#   host=DB_HOST,
+#   user=DB_USER,
+#   password=DB_PASSWORD,
+#   database=DB
+# )
+# cursor = db.cursor()
+
+
+# def add_server(domain, server):
+#     sql = "UPDATE domains SET mosaic_server = %s WHERE domain = %s"
+#     val = (server, domain)
+#     cursor.execute(sql,val)
+#     db.commit()
+#     print(domain, " Updated")
+
 
 def get_domains():
+    db = mysql.connector.connect(
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB
+    )
+    cursor = db.cursor()
     cursor.execute("SELECT * FROM domains")
     result = cursor.fetchall()
     # print(len(result))
     domains = []
     for x in result:
+        # print(x)
+        # break
         x = list(x)
         href = x[1].replace('https://','').replace('.','~')
         x.append(href)
         domains.append(x)
     # for x in result:
     #     domains.append(str(x).replace('(',"").replace(')','').replace(',','').replace('\'',''))
-    print(domains)
+    # print(domains)
+    cursor.close()
+    db.close()
+
     return domains
-get_domains()
+# get_domains()
 
 
 def get_single_domain(domain):
     
     #  UNION SELECT * FROM google_page_speed WHERE domain = {domain}
     try:
+        db = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB
+        )
+        cursor = db.cursor()
     
     #     cursor.execute(f"SELECT * FROM gtmetrix WHERE domain = '{domain}'")
     # #     # cursor.execute(f"SELECT * FROM google_page_speed WHERE domain = '{domain}'")
@@ -53,17 +81,44 @@ def get_single_domain(domain):
     #     print('error')
 
         single_ps_df = pd.read_sql_query(f"SELECT * FROM google_page_speed WHERE domain = '{domain}';",con=db)
+        single_ps_df['first_contentful_paint'] = single_ps_df['first_contentful_paint'] / 1000
+        single_ps_df['time_to_interactive'] = single_ps_df['time_to_interactive'] / 1000
+        # single_ps_df['speed_index'] = single_ps_df['speed_index'] / 1000
+        single_ps_df['total_blocking_time'] = single_ps_df['total_blocking_time'] / 1000
+        single_ps_df['largest_contentful_paint'] = single_ps_df['largest_contentful_paint'] / 1000
+        single_ps_df['cumulative_layout_shift'] = single_ps_df['cumulative_layout_shift'] / 1000
+        single_ps_df['server_response_time'] = single_ps_df['server_response_time'] / 1000
+        single_ps_df['first_meaningful_paint'] = single_ps_df['first_meaningful_paint'] / 1000
         single_ps_df['measurement_date'] = pd.to_datetime(single_ps_df['measurement_date']).dt.date.astype(str)
 
+        single_ps_df = single_ps_df.drop(columns=['speed_index'])
+
         single_gt_df = pd.read_sql_query(f"SELECT * FROM gtmetrix WHERE domain = '{domain}';",con=db)
+        single_gt_df['time_to_first_byte'] = single_gt_df['time_to_first_byte'] / 1000
+        # single_gt_df['first_paint_time'] = single_gt_df['first_paint_time'] / 1000
+        # single_gt_df['onload_time'] = single_gt_df['onload_time'] / 1000
+        # single_gt_df['redirect_duration'] = single_gt_df['redirect_duration'] / 1000
+        # single_gt_df['speed_index'] = single_gt_df['speed_index'] / 1000
+        single_gt_df['dom_interactive_time'] = single_gt_df['dom_interactive_time'] / 1000
+        single_gt_df['first_contentful_paint'] = single_gt_df['first_contentful_paint'] / 1000
+        # single_gt_df['total_blocking_time'] = single_gt_df['total_blocking_time'] / 1000
+        single_gt_df['largest_contentful_paint'] = single_gt_df['largest_contentful_paint'] / 1000
+        single_gt_df['time_to_interactive'] = single_gt_df['time_to_interactive'] / 1000
+        single_gt_df['cumulative_layout_shift'] = single_gt_df['cumulative_layout_shift'] / 1000
+        single_gt_df['fully_loaded_time'] = single_gt_df['fully_loaded_time'] / 1000
         single_gt_df['measurement_date'] = pd.to_datetime(single_gt_df['measurement_date']).dt.date.astype(str)
+        # print(single_gt_df)
+        # print(single_ps_df)
+        single_gt_df = single_gt_df.drop(columns=['first_paint_time','onload_time','redirect_duration', 'speed_index','total_blocking_time'])
 
         single_gt_df = single_gt_df.to_dict(orient='records')
         single_ps_df = single_ps_df.to_dict(orient='records')
-        # print(single_gt_df)
+        # print(single_ps_df)
         
-
+        cursor.close()
+        db.close()
         return single_ps_df, single_gt_df
+
     except:
         return 'Error'
 
@@ -95,6 +150,13 @@ def get_single_domain(domain):
 
 def get_all():
     try:
+        db = mysql.connector.connect(
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB
+        )
+        # cursor = db.cursor()
 
         ps_df = pd.read_sql_query(f"SELECT * FROM google_page_speed;",con=db)
         ps_df['measurement_date'] = pd.to_datetime(ps_df['measurement_date']).dt.date.astype(str)
@@ -107,6 +169,9 @@ def get_all():
         # print(ps_df)
         # print(type(ps_df))
         response = {'pagespeed': ps_df, 'gtmetrix': gt_df}
+        # cursor.close()
+        db.close()
+
         return response
     except DatabaseError as e:
 
@@ -122,6 +187,13 @@ def get_all():
 
 
 def get_basic_metrics():
+    db = mysql.connector.connect(
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB
+    )
+    cursor = db.cursor()
     sql = 'SELECT COUNT(id) from google_page_speed UNION SELECT COUNT(id) from gtmetrix'
     cursor.execute(sql,)
     result = cursor.fetchall()
@@ -155,12 +227,22 @@ def get_basic_metrics():
         'bottom_25_pagespeed':bottom25_ps.to_dict(orient='records')
     }
     # print(stats)
+    cursor.close()
+    db.close()
+
 
     return stats
 
 # get_basic_metrics()
 
 def get_na():
+    db = mysql.connector.connect(
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB
+    )
+    # cursor = db.cursor()
     ps_df = pd.read_sql_query(f"SELECT * FROM google_page_speed;",con=db)
     ps_df['measurement_date'] = pd.to_datetime(ps_df['measurement_date']).dt.date.astype(str)
 
@@ -171,7 +253,27 @@ def get_na():
     df_na = df[df.isnull().any(axis=1)]
 
     df_na = df_na.to_dict(orient='records')
+    # cursor.close()
+    db.close()
+
     return df_na
+
+def add_domain(domain,server):
+    db = mysql.connector.connect(
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB
+    )
+    cursor = db.cursor()
+
+    sql = "INSERT INTO domains (domain, mosaic_server) VALUES (%s, %s)"
+    val = (domain, server)
+    cursor.execute(sql, val)
+    db.commit()
+    cursor.close()
+    db.close()
+
 
 # get_na()
 # get_entries_count()
